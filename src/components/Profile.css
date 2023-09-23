@@ -1,0 +1,72 @@
+.theme-dark .zoo-highlight {
+    color: cyan !important;
+}
+.theme-light .zoo-highlight {
+    color: #007799 !important;
+}
+
+.zoo-cards {
+    margin-top: 12px;
+    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 2;
+    grid-template-rows: auto;
+    gap: 12px;
+    grid-auto-flow: dense;
+}
+
+.zoo-card {
+    padding: 15px;
+    border-radius: 4px;
+    border: 1px solid var(--profile-body-divider-color, var(--background-modifier-accent));
+}
+.zoo-section-header {
+    grid-column: 1 / span 2;
+}
+.zoo-section-animals {
+    grid-column: 1 / span 2;
+}
+.zoo-section-items {
+    grid-column: 1 / span 1;
+    grid-row: auto / span 3;
+}
+.zoo-section-relics {
+    grid-column: 2 / span 1;
+}
+.zoo-section-cosmetics {
+    grid-column: 2 / span 1;
+}
+.zoo-section-leaders {
+    grid-column: 2 / span 1;
+}
+.zoo-section-quests {
+    grid-column: 2 / span 1;
+}
+.zoo-section-goals {
+    grid-column: 1 / span 1;
+    grid-row: auto / span 2;
+}
+.zoo-section-misc {
+    grid-column: 2 / span 1;
+}
+
+.zoo-animals-list {
+    display: grid;
+    grid-template-columns: 2;
+    grid-template-rows: auto;
+}
+.zoo-items-list {
+    display: grid;
+    grid-template-columns: 1;
+    grid-template-rows: auto;
+}
+.zoo-relics-list,
+.zoo-cosmetics-list, .zoo-trophies-list,
+.zoo-leaders-list,
+.zoo-quests-list,
+.zoo-goals-list,
+.zoo-misc-list {
+    display: grid;
+    grid-template-columns: 1;
+    grid-template-rows: auto;
+}

@@ -1,18 +1,19 @@
 {
-  "id": "dev.replugged.PluginTemplate",
-  "name": "Plugin Template",
-  "description": "A plugin template",
+  "id": "mod.cgytrus.zoo",
+  "name": "Zoo",
+  "description": "[Zoo](https://gdcolon.com/zoo) integration for Replugged.",
   "author": {
-    "name": "replugged",
-    "discordID": "1000992611840049192",
-    "github": "replugged-org"
+    "name": "ConfiG",
+    "discordID": "357517231854190592",
+    "github": "cgytrus"
   },
   "version": "1.0.0",
   "updater": {
-    "type": "github",
-    "id": "replugged-org/plugin-template"
+    "type": "store",
+    "id": "mod.cgytrus.zoo"
   },
   "license": "MIT",
+  "source": "https://github.com/cgytrus/replugged-zoo",
   "type": "replugged-plugin",
   "renderer": "src/index.ts"
 }
