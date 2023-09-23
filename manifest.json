@@ -13,6 +13,7 @@
     "id": "mod.cgytrus.zoo"
   },
   "license": "MIT",
+  "image": "https://cdn.discordapp.com/attachments/504366353965121589/1155281662112964659/replugged-zoo-0.gif",
   "source": "https://github.com/cgytrus/replugged-zoo",
   "type": "replugged-plugin",
   "renderer": "src/index.ts"
