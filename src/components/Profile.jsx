@@ -52,13 +52,18 @@ function MinimalHeaderBlock(props) {
             }
         }
 
+        let titleStyle = { marginBottom: '12px' };
+        if(color) {
+            titleStyle.color = `#${color}`;
+        }
+
         let privateText = '';
         if(props.profile.private) {
             privateText = (<Text.Normal>(private)</Text.Normal>);
         }
 
         return (<div className='zoo-card zoo-section-header'>
-            <Text.H1 style={{ color: `#${color}`, marginBottom: '12px' }}>{cosmetic}{displayName} {privateText}</Text.H1>
+            <Text.H1 style={titleStyle}>{cosmetic}{displayName} {privateText}</Text.H1>
             <Text.Normal>✧ <b>{score}</b> total score</Text.Normal>
         </div>);
     }
@@ -77,7 +82,7 @@ function HeaderBlock(props) {
         const { color, name, score, completion, uniqueAnimals, totalAnimals, cosmeticIcon } = props.profile;
 
         let displayName = name;
-        let cosmetic = {};
+        let cosmetic = '';
         if(cosmeticIcon && parser) {
             const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
             const emojiParser = parser.reactParserFor(rules);
@@ -87,13 +92,18 @@ function HeaderBlock(props) {
             }
         }
 
+        let titleStyle = { marginBottom: '12px' };
+        if(color) {
+            titleStyle.color = `#${color}`;
+        }
+
         let privateText = '';
         if(props.profile.private) {
             privateText = (<Text.Normal>(private)</Text.Normal>);
         }
 
         return (<div className='zoo-card zoo-section-header'>
-            <Text.H1 style={{ color: `#${color}`, marginBottom: '12px' }}>{cosmetic}{displayName} {privateText}</Text.H1>
+            <Text.H1 style={titleStyle}>{cosmetic}{displayName} {privateText}</Text.H1>
             <Text.Normal>
                 <b>{totalAnimals.common}</b> commons + <b>{totalAnimals.rare}</b> rares = ✧ <b>{score}</b> total score
                 <br />
@@ -484,6 +494,10 @@ function MiscBlock(props) {
     try {
         const { color, notifications, extraData, settings } = props.profile;
 
+        if(!color && notifications == 0 && extraData.length == 0) {
+            return ('');
+        }
+
         let getEmoji = (text) => text;
         if(parser) {
             const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
@@ -509,12 +523,12 @@ function MiscBlock(props) {
         return (<div className='zoo-card zoo-section-misc'>
             <Text.H3 style={{ marginBottom: '8px' }}>Misc</Text.H3>
             <div className='zoo-misc-list'>
-                <Text.Normal style={{ gridColumn: 1, marginBottom: '8px' }}>
+                {color ? (<Text.Normal style={{ gridColumn: 1, marginBottom: '8px' }}>
                     {getEmoji('🎨')} <b>Color:</b> <span style={{ color: `#${color}` }}>#{color}</span> {settings.disableCustomColor ? '(off)' : ''}
-                </Text.Normal>
-                <Text.Normal style={{ gridColumn: 1, marginBottom: '8px' }}>
+                </Text.Normal>) : ''}
+                {notifications > 0 ? (<Text.Normal style={{ gridColumn: 1, marginBottom: '8px' }}>
                     {getEmoji('🔔')} <b>Notifications:</b> {notifications} {settings.disableNotifications ? '(off)' : ''}
-                </Text.Normal>
+                </Text.Normal>) : ''}
                 {extraData.flatMap(data => (<ExtraData data={data} style={{ gridColumn: 1, marginBottom: '8px' }} />))}
             </div>
         </div>);
@@ -536,7 +550,7 @@ function Profile({ userId, profiles }) {
         return (<Loader className='zoo-section-loading' />);
     }
     else if(!profiles || classes.loaded === -1) {
-        return (<div className='zoo-section-error' >
+        return (<div className='zoo-section-error'>
             <span className={classes.userInfoText}>An error occured. {profiles}, {classes.loaded}</span>
         </div>);
     }
@@ -545,9 +559,16 @@ function Profile({ userId, profiles }) {
     return (
         <div className={classes.infoScroller} dir='ltr' style={{ 'overflow': 'hidden scroll', 'padding-right': '12px' }}>
             {profiles.map(profile => {
-                let divider = (<Divider />);
-                if(first)
-                    divider = '';
+                if(typeof profile === 'undefined') {
+                    return (<Loader className='zoo-section-loading' />);
+                }
+                else if(!profile) {
+                    return (<Notice messageType={Notice.Types.ERROR}>
+                        There was an error rendering this profile. Check console for details.
+                    </Notice>);
+                }
+
+                const divider = first ? '' : (<Divider />);
                 first = false;
                 if(profile.viewable !== undefined && !profile.viewable) {
                     return (<div>
