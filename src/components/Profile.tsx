@@ -28,7 +28,7 @@ Promise.all([
 ])
 .then((mods) => {
     // can't wait for this one bc it will only give the 1st one that loads
-    const userProfileHeader = webpack.getByProps(['eyebrow'], { all: true })[2] as { eyebrow: string };
+    const userProfileHeader = webpack.getByProps<{ eyebrow: string }>(['eyebrow'], { all: true })[2];
 
     const userProfileTabBar = (mods[0] as { tabBar: string, tabBarItem: string });
     const userProfileInfo = (mods[1] as { infoScroller: string, userInfoSectionHeader: string, userInfoText: string });
@@ -39,7 +39,7 @@ Promise.all([
 
     classes.infoScroller = `${userProfileInfo.infoScroller} ${userProfileScroller.thin} ${userProfileScroller.fade}`;
     classes.userInfoSectionHeader = `${userProfileInfo.userInfoSectionHeader} ${userProfileHeader.eyebrow}`;
-    classes.userInfoText = `${userProfileInfo.userInfoText} ${(webpack.getByProps('markup') as { markup: string }).markup}`;
+    classes.userInfoText = `${userProfileInfo.userInfoText} ${webpack.getByProps<{ markup: string }>('markup')!.markup}`;
 
     // if all above succeded, allow rendering of the profile
     classes.loaded = 1;
