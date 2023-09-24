@@ -1,106 +1,90 @@
 import { webpack, common, components } from 'replugged';
-const { React, flux, parser } = common;
-const Flux = flux;
-const { Loader, Divider, Text, FormText, Notice } = components;
+const { React, lodash: _, flux: Flux, parser } = common;
+const { Loader, Divider, Text, Notice } = components;
 import profileStore from '../profileStore.js';
-import Messages from '../i18n.js';
+
+import { ZooProfileError, UnviewableZooProfile, ZooProfile } from '../ZooProfile';
+
+// https://stackoverflow.com/a/51399781
+type ArrayElement<ArrayType extends readonly unknown[]> =
+    ArrayType extends readonly (infer ElementType)[] ? ElementType : never;
 
 import './Profile.css';
 
-const classes = {};
-function waitForByProps(...args) {
-    return webpack.waitForModule(webpack.filters.byProps(...args));
-}
+const classes = {
+    userProfileTabBar: '',
+    userProfileTabBarItem: '',
+    infoScroller: '',
+    userInfoSectionHeader: '',
+    userInfoText: '',
+    loaded: 0,
+};
 
 // all will probably resolve at the same time, but they're seperate queries to it's best to do this
 Promise.all([
-    waitForByProps('tabBar', 'tabBarItem', 'root'),
-    waitForByProps('userInfoSectionHeader'),
-    waitForByProps('scrollerBase', 'thin')
+    webpack.waitForProps('tabBar', 'tabBarItem', 'root'),
+    webpack.waitForProps('userInfoSectionHeader'),
+    webpack.waitForProps('scrollerBase', 'thin')
 ])
-.then(([userProfileTabBar, userProfileInfo, userProfileScroller]) => {
+.then((mods) => {
     // can't wait for this one bc it will only give the 1st one that loads
-    const userProfileHeader = webpack.getByProps(['eyebrow'], { all: true })[2];
+    const userProfileHeader = webpack.getByProps(['eyebrow'], { all: true })[2] as { eyebrow: string };
+
+    const userProfileTabBar = (mods[0] as { tabBar: string, tabBarItem: string });
+    const userProfileInfo = (mods[1] as { infoScroller: string, userInfoSectionHeader: string, userInfoText: string });
+    const userProfileScroller = (mods[2] as { thin: string, fade: string });
 
     classes.userProfileTabBar = userProfileTabBar.tabBar;
     classes.userProfileTabBarItem = userProfileTabBar.tabBarItem;
 
     classes.infoScroller = `${userProfileInfo.infoScroller} ${userProfileScroller.thin} ${userProfileScroller.fade}`;
     classes.userInfoSectionHeader = `${userProfileInfo.userInfoSectionHeader} ${userProfileHeader.eyebrow}`;
-    classes.userInfoText = `${userProfileInfo.userInfoText} ${webpack.getByProps('markup').markup}`;
+    classes.userInfoText = `${userProfileInfo.userInfoText} ${(webpack.getByProps('markup') as { markup: string }).markup}`;
 
     // if all above succeded, allow rendering of the profile
-    classes.loaded = true;
+    classes.loaded = 1;
 })
 .catch(e => {
     console.warn('Profile failed to get classes:', e);
     classes.loaded = -1;
 });
 
-function MinimalHeaderBlock(props) {
+let getEmoji = (text: string) : string | React.ReactElement => text;
+
+function HeaderBlock({ profile }: { profile: UnviewableZooProfile | ZooProfile }) {
     try {
-        const { color, name, score, cosmeticIcon } = props.profile;
+        const { color, name, score, cosmeticIcon } = profile;
 
         let displayName = name;
-        let cosmetic = {};
-        if(cosmeticIcon && parser) {
-            const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
-            const emojiParser = parser.reactParserFor(rules);
-            if(emojiParser) {
-                displayName = '  ' + displayName;
-                cosmetic = emojiParser(cosmeticIcon);
-            }
+        let cosmetic: string | React.ReactElement = '';
+        if(cosmeticIcon) {
+            displayName = '  ' + displayName;
+            cosmetic = getEmoji(cosmeticIcon);
         }
 
-        let titleStyle = { marginBottom: '12px' };
+        let titleStyle: { marginBottom: string, color: undefined | string } = {
+            marginBottom: '12px',
+            color: undefined
+        };
         if(color) {
             titleStyle.color = `#${color}`;
         }
 
-        let privateText = '';
-        if(props.profile.private) {
+        let privateText: string | React.ReactElement = '';
+        if(profile.private) {
             privateText = (<Text.Normal>(private)</Text.Normal>);
         }
 
-        return (<div className='zoo-card zoo-section-header'>
-            <Text.H1 style={titleStyle}>{cosmetic}{displayName} {privateText}</Text.H1>
-            <Text.Normal>✧ <b>{score}</b> total score</Text.Normal>
-        </div>);
-    }
-    catch(ex) {
-        console.error('Error rendering section:', ex);
-        return (<div className='zoo-card zoo-section-header'>
-            <Notice messageType={Notice.Types.ERROR}>
-                There was an error rendering this card. Check console for details.
-            </Notice>
-        </div>);
-    }
-}
-
-function HeaderBlock(props) {
-    try {
-        const { color, name, score, completion, uniqueAnimals, totalAnimals, cosmeticIcon } = props.profile;
-
-        let displayName = name;
-        let cosmetic = '';
-        if(cosmeticIcon && parser) {
-            const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
-            const emojiParser = parser.reactParserFor(rules);
-            if(emojiParser) {
-                displayName = '  ' + displayName;
-                cosmetic = emojiParser(cosmeticIcon);
-            }
+        if('viewable' in profile) {
+            return (<div className='zoo-card zoo-section-header'>
+                <Text.H1 style={titleStyle}>{cosmetic}{displayName} {privateText}</Text.H1>
+                <Text.Normal>
+                    ✧ <b>{score}</b> total score
+                </Text.Normal>
+            </div>);
         }
 
-        let titleStyle = { marginBottom: '12px' };
-        if(color) {
-            titleStyle.color = `#${color}`;
-        }
-
-        let privateText = '';
-        if(props.profile.private) {
-            privateText = (<Text.Normal>(private)</Text.Normal>);
-        }
+        const { completion, uniqueAnimals, totalAnimals } = profile;
 
         return (<div className='zoo-card zoo-section-header'>
             <Text.H1 style={titleStyle}>{cosmetic}{displayName} {privateText}</Text.H1>
@@ -123,36 +107,21 @@ function HeaderBlock(props) {
     }
 }
 
-function AnimalsBlock(props) {
+function AnimalsBlock({ profile }: { profile: ZooProfile }) {
     try {
-        const { animals, totalAnimals } = props.profile;
-
-        if(animals.length == 0) {
-            return ('');
-        }
-
-        let getEmoji = (text) => text;
-        if(parser) {
-            const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
-            const emojiParser = parser.reactParserFor(rules);
-            if(emojiParser) {
-                getEmoji = (text) => emojiParser(text);
-            }
-        }
+        const { animals, totalAnimals } = profile;
 
         const pinnedIcon = getEmoji('📌');
 
-        let familiesObj = {};
+        let familiesMap = new Map();
         animals.forEach(animal => {
-            let family = familiesObj[animal.family];
-            if(family === undefined) {
-                family = {
+            let family = familiesMap.has(animal.family) ? familiesMap.get(animal.family) :
+                {
                     common: undefined,
                     rare: undefined,
                     score: 0,
                     pinned: false
                 };
-            }
             if (animal.rare) {
                 family.rare = animal;
             }
@@ -163,9 +132,9 @@ function AnimalsBlock(props) {
             if(animal.pinned) {
                 family.pinned = true;
             }
-            familiesObj[animal.family] = family;
+            familiesMap.set(animal.family, family);
         });
-        let families = Object.values(familiesObj);
+        let families = Array.from(familiesMap.values());
         families.sort((a, b) => {
             if (a.pinned == b.pinned) {
                 return b.score - a.score;
@@ -175,14 +144,20 @@ function AnimalsBlock(props) {
             return 1;
         });
 
-        const Animal = props => {
+        const Animal = (props: { animal: ArrayElement<ZooProfile['animals']>, title: string, style: React.CSSProperties | undefined }) => {
             if(props.animal === undefined) {
+                if(!props.style) {
+                    props.style = {};
+                }
                 props.style.opacity = 0.33;
                 return (<Text.Normal style={props.style} title={props.title}>
                     {getEmoji('❓')} Undiscovered
                 </Text.Normal>);
             }
             if(props.animal.amount == 0) {
+                if(!props.style) {
+                    props.style = {};
+                }
                 props.style.opacity = 0.33;
             }
             return (<Text.Normal style={props.style} title={props.title}>
@@ -215,28 +190,18 @@ function AnimalsBlock(props) {
     }
 }
 
-function ItemsBlock(props) {
+function ItemsBlock({ profile }: { profile: ZooProfile }) {
     try {
-        const { items, totalItems } = props.profile;
+        const { items, totalItems } = profile;
 
-        if(items.length == 0) {
-            return ('');
-        }
-
-        let getEmoji = (text) => text;
-        if(parser) {
-            const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
-            const emojiParser = parser.reactParserFor(rules);
-            if(emojiParser) {
-                getEmoji = (text) => emojiParser(text);
-            }
-        }
-
-        const Item = props => {
+        const Item = (props: { item: ArrayElement<ZooProfile['items']>, style: React.CSSProperties | undefined }) => {
             if(props.item.unlisted) {
                 return (null);
             }
             if(props.item.notCounted) {
+                if(!props.style) {
+                    props.style = {};
+                }
                 props.style.opacity = 0.33;
             }
             return (<Text.Normal style={props.style} title={props.item.description}>
@@ -259,24 +224,11 @@ function ItemsBlock(props) {
     }
 }
 
-function RelicsBlock(props) {
+function RelicsBlock({ profile }: { profile: ZooProfile }) {
     try {
-        const { relics, equippedRelic } = props.profile;
+        const { relics, equippedRelic } = profile;
 
-        if(relics.length == 0) {
-            return ('');
-        }
-
-        let getEmoji = (text) => text;
-        if(parser) {
-            const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
-            const emojiParser = parser.reactParserFor(rules);
-            if(emojiParser) {
-                getEmoji = (text) => emojiParser(text);
-            }
-        }
-
-        const Relic = props => {
+        const Relic = (props: { relic: ArrayElement<ZooProfile['relics']>, style: React.CSSProperties | undefined }) => {
             const equipped = props.relic.name == equippedRelic;
             let name = equipped ? (<u>{props.relic.name}</u>) : props.relic.name;
             return (<Text.Normal style={props.style} title={props.relic.description}>
@@ -305,28 +257,15 @@ function RelicsBlock(props) {
     }
 }
 
-function CosmeticsBlock(props) {
+function CosmeticsBlock({ profile }: { profile: ZooProfile }) {
     try {
-        const { cosmetics, totalCosmetics, totalTrophies, equippedCosmetic } = props.profile;
+        const { cosmetics, totalCosmetics, totalTrophies, equippedCosmetic } = profile;
 
-        if(cosmetics.length == 0) {
-            return ('');
-        }
-
-        let getEmoji = (text) => text;
-        if(parser) {
-            const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
-            const emojiParser = parser.reactParserFor(rules);
-            if(emojiParser) {
-                getEmoji = (text) => emojiParser(text);
-            }
-        }
-
-        const Cosmetic = props => {
+        const Cosmetic = (props: { cosmetic: ArrayElement<ZooProfile['cosmetics']>, style: React.CSSProperties | undefined }) => {
             const equipped = props.cosmetic.name == equippedCosmetic;
             let name = equipped ? (<u>{props.cosmetic.name}</u>) : props.cosmetic.name;
             return (<Text.Normal style={props.style}>
-                {getEmoji(props.cosmetic.emoji)} <b className={props.cosmetic.trophy >= 2 ? 'zoo-highlight' : ''}>{name}</b>{equipped ? ' (equipped)' : ''}
+                {getEmoji(props.cosmetic.emoji)} <b className={props.cosmetic.trophy && props.cosmetic.trophy >= 2 ? 'zoo-highlight' : ''}>{name}</b>{equipped ? ' (equipped)' : ''}
             </Text.Normal>);
         };
 
@@ -365,24 +304,11 @@ function CosmeticsBlock(props) {
     }
 }
 
-function LeadersBlock(props) {
+function LeadersBlock({ profile }: { profile: ZooProfile }) {
     try {
-        const { leaders, equippedLeader } = props.profile;
+        const { leaders, equippedLeader } = profile;
 
-        if(leaders.length == 0) {
-            return ('');
-        }
-
-        let getEmoji = (text) => text;
-        if(parser) {
-            const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
-            const emojiParser = parser.reactParserFor(rules);
-            if(emojiParser) {
-                getEmoji = (text) => emojiParser(text);
-            }
-        }
-
-        const Leader = props => {
+        const Leader = (props: { leader: ArrayElement<ZooProfile['leaders']>, style: React.CSSProperties | undefined }) => {
             const equipped = props.leader.name == equippedLeader;
             let name = equipped ? (<u>{props.leader.name}</u>) : props.leader.name;
             return (<Text.Normal style={props.style}>
@@ -411,26 +337,13 @@ function LeadersBlock(props) {
     }
 }
 
-function QuestsBlock(props) {
+function QuestsBlock({ profile }: { profile: ZooProfile }) {
     try {
-        const { quests, quest } = props.profile;
+        const { quests, quest } = profile;
 
-        if(quests.length == 0) {
-            return ('');
-        }
-
-        let getEmoji = (text) => text;
-        if(parser) {
-            const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
-            const emojiParser = parser.reactParserFor(rules);
-            if(emojiParser) {
-                getEmoji = (text) => emojiParser(text);
-            }
-        }
-
-        const Quest = props => {
+        const Quest = (props: { quest: ArrayElement<ZooProfile['quests']>, style: React.CSSProperties | undefined }) => {
             const current = quest && props.quest.type == quest.type;
-            let name = props.quest.type[0].toUpperCase() + props.quest.type.slice(1);
+            let name: string | React.ReactElement = props.quest.type[0].toUpperCase() + props.quest.type.slice(1);
             name = current ? (<u>{name}</u>) : name;
             return (<Text.Normal style={props.style}>
                 {getEmoji(props.quest.emoji)} {props.quest.completed}⨯ <b>{name}</b> {current ? `- ${quest.animal}` : ''}
@@ -452,20 +365,11 @@ function QuestsBlock(props) {
     }
 }
 
-function GoalsBlock(props) {
+function GoalsBlock({ profile }: { profile: ZooProfile }) {
     try {
-        const { goals, goalTiers } = props.profile;
+        const { goals, goalTiers } = profile;
 
-        let getEmoji = (text) => text;
-        if(parser) {
-            const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
-            const emojiParser = parser.reactParserFor(rules);
-            if(emojiParser) {
-                getEmoji = (text) => emojiParser(text);
-            }
-        }
-
-        const Goal = props => {
+        const Goal = (props: { goal: ArrayElement<ZooProfile['goals']>, style: React.CSSProperties | undefined }) => {
             let countStr = props.goal.count.toLocaleString();
             if(!props.goal.complete) {
                 countStr += `/${props.goal.target.toLocaleString()}`;
@@ -490,28 +394,15 @@ function GoalsBlock(props) {
     }
 }
 
-function MiscBlock(props) {
+function MiscBlock({ profile }: { profile: ZooProfile }) {
     try {
-        const { color, notifications, extraData, settings } = props.profile;
+        const { color, notifications, extraData, settings } = profile;
 
-        if(!color && notifications == 0 && extraData.length == 0) {
-            return ('');
-        }
-
-        let getEmoji = (text) => text;
-        if(parser) {
-            const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
-            const emojiParser = parser.reactParserFor(rules);
-            if(emojiParser) {
-                getEmoji = (text) => emojiParser(text);
-            }
-        }
-
-        const ExtraData = props => {
+        const ExtraData = (props: { data: ArrayElement<ZooProfile['extraData']>, style: React.CSSProperties | undefined }) => {
             const emoji = props.data.length >= 1 ? getEmoji(props.data[0]) : '';
             let name = props.data.length >= 2 ? props.data[1] : '';
             let amount = '';
-            if(props.data.length >= 3) {
+            if(typeof props.data[2] !== 'undefined') {
                 name += ':';
                 amount = props.data[2].toLocaleString();
             }
@@ -543,26 +434,36 @@ function MiscBlock(props) {
     }
 }
 
-function Profile({ userId, profiles }) {
+function Profile({ userId, profiles }: { userId: string, profiles: undefined | null | (ZooProfileError | UnviewableZooProfile | ZooProfile)[] }) {
     React.useEffect(() => void profileStore.fetchProfiles(userId), [userId]);
 
-    if(typeof profiles === 'undefined' || !classes.loaded) {
+    if(typeof profiles === 'undefined' || classes.loaded === 0) {
         return (<Loader className='zoo-section-loading' />);
     }
     else if(!profiles || classes.loaded === -1) {
-        return (<div className='zoo-section-error'>
-            <span className={classes.userInfoText}>An error occured. {profiles}, {classes.loaded}</span>
-        </div>);
+        console.error('Error rendering profiles', classes.loaded, profiles);
+        return (<Notice messageType={Notice.Types.ERROR}>
+            There was an error rendering this user's profiles. Check console for details.
+        </Notice>);
+    }
+
+    if(parser) {
+        const rules = _.pick(parser.defaultRules, [ 'text', 'emoji', 'customEmoji' ]);
+        const emojiParser = parser.reactParserFor(rules);
+        if(emojiParser) {
+            getEmoji = (text) => emojiParser(text);
+        }
     }
 
     let first = true;
     return (
-        <div className={classes.infoScroller} dir='ltr' style={{ 'overflow': 'hidden scroll', 'padding-right': '12px' }}>
+        <div className={classes.infoScroller} dir='ltr' style={{ overflow: 'hidden scroll', paddingRight: '12px' }}>
             {profiles.map(profile => {
                 if(typeof profile === 'undefined') {
                     return (<Loader className='zoo-section-loading' />);
                 }
-                else if(!profile) {
+                else if('error' in profile) {
+                    console.error('Error rendering profile', profile);
                     return (<Notice messageType={Notice.Types.ERROR}>
                         There was an error rendering this profile. Check console for details.
                     </Notice>);
@@ -570,14 +471,16 @@ function Profile({ userId, profiles }) {
 
                 const divider = first ? '' : (<Divider />);
                 first = false;
-                if(profile.viewable !== undefined && !profile.viewable) {
+
+                if('viewable' in profile) {
                     return (<div>
                         {divider}
                         <div className='zoo-cards'>
-                            <MinimalHeaderBlock profile={profile} />
+                            <HeaderBlock profile={profile} />
                         </div>
                     </div>);
                 }
+
                 return (<div>
                     {divider}
                     <div className='zoo-cards'>
@@ -599,7 +502,7 @@ function Profile({ userId, profiles }) {
 
 export default Flux.connectStores(
     [profileStore],
-    ({ userId }) => ({
+    ({ userId } : { userId: string, profiles: undefined | null | (ZooProfileError | UnviewableZooProfile | ZooProfile)[] }) => ({
         profiles: profileStore.getProfiles(userId)
     })
 )(React.memo(Profile));
